@@ -1,0 +1,26 @@
+{
+    "id": "553E19BD",
+    "path": "~/Design Patterns in R with Applications in Data Science/R/eia_data.R",
+    "project_path": "R/eia_data.R",
+    "type": "r_source",
+    "hash": "3721366673",
+    "contents": "",
+    "dirty": false,
+    "created": 1626545962144.0,
+    "source_on_save": false,
+    "relative_order": 5,
+    "properties": {
+        "tempName": "Untitled1",
+        "cursorPosition": "82,66",
+        "scrollLine": "0",
+        "source_window_id": ""
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1627074870,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1627074870671,
+    "read_only": false,
+    "read_only_alternatives": []
+}

@@ -1,0 +1,5 @@
+book_filename: "Design Patterns in R with Applications in Data Science"
+delete_merged_file: true
+language:
+  ui:
+    chapter_name: "Chapter "

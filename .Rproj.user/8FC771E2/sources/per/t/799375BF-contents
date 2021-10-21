@@ -1,0 +1,153 @@
+---
+title: "Utilizing R to Access Oil Production Data"
+author: "Andrew Leonard"
+date: "7/23/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## How to use R with an API
+
+### This R Markdown document will provide an example of how to access oil production data for the US by state via the EIA API.
+
+Start off by loading the necessary packages.
+```{r}
+library("glue")
+library("httr")
+library("jsonlite")
+library("data.table")
+library("anytime")
+suppressMessages(library("here"))
+```
+
+
+Then setup a method to read your API key in without sharing it with everyone on GitHub.
+```{r}
+get_api_key <- function() {
+  user_profile <- Sys.getenv("USERPROFILE")
+  path_to_key <- file.path(user_profile, "Documents", "Creds", "eia_api_key.txt")
+  file_size <- file.info(path_to_key)$size
+  api_key <- readChar(path_to_key, file_size)
+  return(api_key)
+}
+
+
+api_key <- get_api_key()
+api_url <- "http://api.eia.gov/series/?api_key={api_key}&series_id=PET.MCRFP{state_abb}1.M"
+```
+
+
+Create functions to handle the requests.
+```{r}
+format_eia_url <- function(state_abb) {
+  glue(api_url, api_key = api_key, state_abb = state_abb)
+}
+
+get_eia_response <- function(state_abb) {
+  url <- format_eia_url(state_abb)
+  res <- GET(url)
+  return(res)
+}
+
+response_to_json <- function(res) {
+  json <- fromJSON(rawToChar(res$content))
+  return(json)
+}
+
+json_to_data <- function(json) {
+  .data <- json$series$data
+  return(.data)
+}
+```
+
+Create functions to format data.
+```{r}
+rename_columns <- function(DT) {
+  old <- names(DT)
+  .new <- c("date", "barrel")
+  setnames(DT, old = old, new = .new)
+}
+
+all_cols_to_char <- function(DT) {
+  for (j in names(DT)) 
+    set(DT, j = j, value = as.character(DT[[j]]))
+}
+
+convert_date_col <- function(DT) {
+  DT[, date := anydate(date)]
+}
+
+format_data <- function(.data) {
+  setDT(.data)
+  rename_columns(.data)
+  all_cols_to_char(.data)
+  convert_date_col(.data)
+}
+```
+
+Create functions to bring it all together.
+```{r}
+run <- function(state_abb) {
+  res <- get_eia_response(state_abb)
+  json <- response_to_json(res)
+  .data <- json_to_data(json)
+  DT <- format_data(.data)
+  return(DT)
+}
+
+state_abb_to_name <- function(state_abb) {
+  state_name <- toupper(state.name[which(state.abb == state_abb)])
+  return(state_name)
+}
+```
+
+Run it and filter for big fracking states.
+```{r}
+state_abbs <- c("TX", "ND", "SD", "CO", "MT", "NE", "NM", "WY", "PA", "WV", "OH", "NY", "LA", "OK", "AR")
+results <- sapply(state_abbs, run, USE.NAMES = TRUE, simplify = F)
+DT <- rbindlist(results, use.names = TRUE, idcol = "state_abb")
+DT[, state := state_abb_to_name(state_abb), by = .(state_abb)]
+DT[, `:=` (year = year(date), 
+           barrel = as.numeric(barrel))]
+setcolorder(DT, c('state_abb', 'state', 'year', 'date', 'barrel'))
+```
+
+View results.
+```{r}
+head(DT)
+tail(DT)
+str(DT)
+summary(DT)
+```
+
+Calculate the number of total days in each month.
+```{r}
+calc_eomonth_day <- function(date) {
+  first_of_next_month <- lubridate::ceiling_date(date, unit = "month")
+  lubridate::day(first_of_next_month - 1)
+}
+DT[, num_days_in_month := calc_eomonth_day(date)]
+DT[, barrels_per_day := barrel / num_days_in_month]
+ # drop the num_days_in_month columns
+DT[, num_days_in_month := NULL]
+head(DT)
+```
+
+Save the results to a CSV file.
+```{r}
+csv_fname <- here("Data", "eia_oil_data.csv")
+fwrite(DT, csv_fname)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
